@@ -355,7 +355,6 @@ def unlockModem(port, lockCode):
     ser.close()
 
 def auto():
-    intro()
     # Work out which is the control port
     try:
         activePort = identifyPort()
