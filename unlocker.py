@@ -31,7 +31,7 @@ class menuClass:
     status = 1
     command = {}
     setup={
-        'hilinkIp':"192.168.8.1",
+        'hilink ip':"192.168.8.1",
         'IMEI':"?",
         'seriali port':"?",
         'lock status':"?",
@@ -39,7 +39,10 @@ class menuClass:
         'mobile carrier':"?",
         'unlock code':"?"
     }
-             
+    def switchToStickMode(self):
+        response = urllib2.urlopen('http://' + self.setup['hilink ip'] + '/html/switchProjectMode.html')
+        html = response.read()
+        response.close()  
     def details(self):
         print 80 * "-"
         for key in self.setup:
@@ -77,11 +80,11 @@ class menuClass:
             if (activePort==''):
                 print "\nCould not identify active port."
                 return False
-            self.setup['serialPort'] = activePort
+            self.setup['serial port'] = activePort
             return True
     def getIMEI(self):
         try:
-            imei = obtainImei(self.setup['serialPort'])
+            imei = obtainImei(self.setup['serial port'])
         except:
             print "\nAn error occurred when trying to check the IMEI."
             return False 
@@ -103,7 +106,7 @@ class menuClass:
 
     def getLockStatus(self):
         try:
-            lockInfo = checkLockStatus(self.setup['serialPort'])
+            lockInfo = checkLockStatus(self.setup['serial port'])
             if not lockInfo:
                 return False
             self.setup['lock status'] = lockInfo['lockStatus']
@@ -143,8 +146,10 @@ class menuClass:
         print "\t e. Exit"
     def menu(self):
         self.title("main menu")
-        print "\t 1. Basic (legacy)"
-        print "\t 2. Advanced"
+        self.menuPoint({
+            '1':"Basic (legacy)",
+            '2':"Advanced"
+        })
         self.command={
             '1':auto,
             '2':self.toAdvanced
@@ -152,16 +157,20 @@ class menuClass:
     def advanced(self):
         self.details()
         self.title("advanced menu")
-        print "\t 1. detect port"
-        print "\t 2. detect imei"
-        print "\t 3. detect lock status"
-        print "\t 4. calculate unlock code"
-        print "\t m. bact to main menu"
+        self.menuPoint({
+            '1':"detect port",
+            '2':"detect imei",
+            '3':"detect lock status",
+            '4':"calculate unlock code",
+            '5':"switch to stick mode",
+            'm':"bact to main menu"
+        })
         self.command={
             '1':self.checkPorts,
             '2':self.getIMEI,
             '3':self.getLockStatus,
-            '4':self.getUnlockCode
+            '4':self.getUnlockCode,
+            '5':self.switchToStickMode
         }
     def toDetailsMenu(self):
         self.status = 3
