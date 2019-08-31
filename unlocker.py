@@ -24,7 +24,7 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
 
-import sys, time, serial, re, hashlib, glob, urllib2
+import sys, time, serial, re, hashlib, glob, urllib2, collections
 
 
 class menuClass:
@@ -141,15 +141,15 @@ class menuClass:
         print "Huawei unlocker "+text 
         print 80*"="
     def menuPoint (self, menu):
-        for key in menu:
+        for key in sorted(menu.keys()):
             print "\t " + key + ". " + menu[key]
         print "\t e. Exit"
     def menu(self):
         self.title("main menu")
-        self.menuPoint({
+        self.menuPoint(collections.OrderedDict({
             '1':"Basic (legacy)",
             '2':"Advanced"
-        })
+        }))
         self.command={
             '1':auto,
             '2':self.toAdvanced
@@ -157,14 +157,14 @@ class menuClass:
     def advanced(self):
         self.details()
         self.title("advanced menu")
-        self.menuPoint({
+        self.menuPoint(collections.OrderedDict({
             '1':"detect port",
             '2':"detect imei",
             '3':"detect lock status",
             '4':"calculate unlock code",
             '5':"switch to stick mode",
             'm':"bact to main menu"
-        })
+        }))
         self.command={
             '1':self.checkPorts,
             '2':self.getIMEI,
