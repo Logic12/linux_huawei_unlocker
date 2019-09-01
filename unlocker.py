@@ -33,7 +33,7 @@ class menuClass:
     setup={
         'hilink ip':"192.168.8.1",
         'IMEI':"?",
-        'seriali port':"?",
+        'serial port':"?",
         'lock status':"?",
         'lock try remaining':"?",
         'mobile carrier':"?",
@@ -49,6 +49,7 @@ class menuClass:
             print(key + " : " + str(self.setup[key]))
         print(80 * "-")
     def detailsMenu(self):
+        self.details()
         self.title('change')
         self.menuPoint({
             '1':"serial port",
@@ -58,7 +59,25 @@ class menuClass:
             'a':"advanced ,menu",
             'm':"main menu",
         })
+        self.ccommand = {
+            '1':self.changeSerialPort,
+            '2':self.changeIMEI,
+            '3':self.changeUnlockCode,
+            '4':self.changeHilinkIp,
+
+        }
+    def changeSerialPort(self):
+        self.setup['serial port'] = self.input('serial port')
+    def changeIMEI(self):
+        self.setup['IMEI'] = self.input('IMEI')
+    def changeUnlockCode(self):
+        self.setup['unlock code'] = self.input('unlock code')
+    def changeHilinkIpe(self):
+        self.setup['hilink ip'] = self.input('hilink ip')
+    def input(self, text):
+        return  input(text + " = ")
     def run(self):
+        self.command['d'] = self.toDetailsMenu
         self.command['a'] = self.toAdvanced
         self.command['m'] = self.toMain
         self.command['e'] = self.toExit
@@ -255,7 +274,7 @@ def identifyPort():
         print("Testing port " + p)
         ser = serial.Serial(port = p,
             timeout = 15, xonxoff=False, rtscts=True, dsrdtr=True)
-        ser.write('AT\r\n')
+        ser.write(b'AT\r\n')
         activity = ser.read(5)
         if activity == '':
             print("\tNo activity\n")
@@ -273,7 +292,7 @@ def obtainImei(port):
     ser = serial.Serial(port = port,
         timeout = 15, xonxoff=False, rtscts=True, dsrdtr=True)
     ser.flushInput()
-    ser.write('AT+CGSN\r\n')
+    ser.write(b'AT+CGSN\r\n')
     time.sleep(5)
     response = ser.read(4096)
     ser.close()
@@ -330,7 +349,7 @@ def checkLockStatus(port):
     ser = serial.Serial(port = port,
         timeout = 15, xonxoff=False, rtscts=True, dsrdtr=True)
     ser.flushInput()
-    ser.write('AT^CARDLOCK?\r\n')
+    ser.write(b'AT^CARDLOCK?\r\n')
     time.sleep(5)
     response = ser.read(4096)
     print(response)
