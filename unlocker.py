@@ -59,7 +59,7 @@ class menuClass:
             'a':"advanced ,menu",
             'm':"main menu",
         })
-        self.ccommand = {
+        self.command={
             '1':self.changeSerialPort,
             '2':self.changeIMEI,
             '3':self.changeUnlockCode,
@@ -72,7 +72,7 @@ class menuClass:
         self.setup['IMEI'] = self.input('IMEI')
     def changeUnlockCode(self):
         self.setup['unlock code'] = self.input('unlock code')
-    def changeHilinkIpe(self):
+    def changeHilinkIp(self):
         self.setup['hilink ip'] = self.input('hilink ip')
     def input(self, text):
         return  input(text + " = ")
@@ -82,6 +82,7 @@ class menuClass:
         self.command['m'] = self.toMain
         self.command['e'] = self.toExit
         response = input(">> ")
+        return  self.command[response]()
         try :
             return  self.command[response]()
         except:
@@ -182,6 +183,7 @@ class menuClass:
             '3':"detect lock status",
             '4':"calculate unlock code",
             '5':"switch to stick mode",
+            'd':"details menu",
             'm':"bact to main menu"
         }))
         self.command={
@@ -296,7 +298,7 @@ def obtainImei(port):
     time.sleep(5)
     response = ser.read(4096)
     ser.close()
-    match = re.search('\r\n(\d{15})\r\n', response)
+    match = re.search('\\r\\n(\d{15})\\r\\n', response.decode('utf8'))
     if match:
         print("Found probable IMEI: " + match.group(1))
         return match.group(1)
@@ -352,9 +354,8 @@ def checkLockStatus(port):
     ser.write(b'AT^CARDLOCK?\r\n')
     time.sleep(5)
     response = ser.read(4096)
-    print(response)
     ser.close()
-    match = re.search('CARDLOCK: (\d),(\d\d?),(\d+)\r', response)
+    match = re.search('CARDLOCK: (\d),(\d\d?),(\d+)\r', response.decode('utf8'))
     if match:
         status['lockStatus'] = int(match.group(1))
         status['remaining'] = int(match.group(2))
@@ -367,13 +368,15 @@ def checkLockStatus(port):
 # Adapted from dogbert's original
 def computeUnlockCode(imei):
     salt = '5e8dd316726b0335'
-    digest = hashlib.md5((imei+salt).lower()).digest()
+    digest = hashlib.md5((imei+salt).lower().encode('latin1')).digest().decode('latin1')
+    print(digest)
     code = 0
     for i in range(0,4):
         code += (ord(digest[i])^ord(digest[4+i])^ord(digest[8+i])^ord(digest[12+i])) << (3-i)*8
     code &= 0x1ffffff
     code |= 0x2000000
     return code
+
 
 # Send AT codes to unlock the modem
 def unlockModem(port, lockCode):
