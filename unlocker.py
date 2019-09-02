@@ -120,7 +120,7 @@ class menuClass:
             print(p + " : "+ resultDict[result[p]])
     def unlock(self):
         modem = modemClass(self.setup['serial port'])
-        modem.unlock(self.setup['unlock code'])
+        modem.unLock(self.setup['unlock code'])
         del modem
     def getIMEI(self):
         modem = modemClass(self.setup['serial port'])
@@ -163,6 +163,7 @@ class menuClass:
             '3':"detect lock status",
             '4':"calculate unlock code",
             '5':"switch to stick mode",
+            'UnLoCk':"unlock the modem",
             'd':"details menu",
             'm':"bact to main menu"
         }))
@@ -171,7 +172,8 @@ class menuClass:
             '2':self.getIMEI,
             '3':self.getLockStatus,
             '4':self.getUnlockCode,
-            '5':self.switchToStickMode
+            '5':self.switchToStickMode,
+            'UnLoCk':self.unlock
         }
     def toDetailsMenu(self):
         self.status = 3
@@ -279,8 +281,9 @@ class modemClass:
             return False
         return status
     def unLock(self, unlockCode):
+        self.connect()
         self.write('AT^CARDLOCK="'+ str(unlockCode) + '"\r\n')
-        self.read(64)
+        self.read(32)
     def generateUnlockCodeV1(self):
         salt = '5e8dd316726b0335'
         digest = hashlib.md5((imei+salt).lower().encode('latin1')).digest().decode('latin1')
