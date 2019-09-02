@@ -26,10 +26,19 @@
 
 import sys, time, serial, re, hashlib, glob, urllib.request, urllib.error, urllib.parse, collections
 
+debugMode = True
 
 class menuClass:
     status = 1
     command = {}
+    setupDictonary={
+        "lock status":{
+            '0':'???',
+            '1':'soft locked',
+            '2':'unlocked to the inserted sim',
+            '3':'hard locked'
+        }
+    }
     setup={
         'hilink ip':"192.168.8.1",
         'IMEI':"?",
@@ -46,7 +55,10 @@ class menuClass:
     def details(self):
         print(80 * "-")
         for key in self.setup:
-            print(key + " : " + str(self.setup[key]))
+            try:
+                print(key + " : " + self.setupDictonary[key][str(self.setup[key])])
+            except:
+                print(key + " : " + str(self.setup[key]))
         print(80 * "-")
     def detailsMenu(self):
         self.details()
@@ -90,70 +102,38 @@ class menuClass:
              return False
         return True
     def checkPorts(self):
-        try:
-            activePort = identifyPort()
-        except:
-            print("\nAn error occurred when probing for active ports.")
-            print("This may be because you need to run this program as root.")
-            return False
-        else:
-            if (activePort==''):
-                print("\nCould not identify active port.")
-                return False
-            self.setup['serial port'] = activePort
-            return True
+        ports = glob.glob('/dev/ttyUSB*')
+        result = {}
+        resultDict = ['not active', 'active', 'error']
+        for p in ports:
+            try:
+               print("test port : " + p)
+               modem = modemClass(str(p))
+               result[p] = modem.test()
+               del modem
+            except:
+               result[p] = 2
+               del modem
+        for p in result:
+            if result[p] == 1:
+               self.setup['serial port']=p;
+            print(p + " : "+ resultDict[result[p]])
+    def unlock(self):
+        modem = modemClass(self.setup['serial port'])
+        modem.unlock(self.setup['unlock code'])
+        del modem
     def getIMEI(self):
-        try:
-            imei = obtainImei(self.setup['serial port'])
-        except:
-            print("\nAn error occurred when trying to check the IMEI.")
-            return False 
-        else:
-            if (imei==''):
-                 print("\nCould not obtain IMEI.")
-                 print("Check the modem is properly inserted")
-                 print("Check a SIM card is in place")
-                 print("Check you are not already connected")
-                 print("Try removing and reinserting the device")
-                 return False
-            else:
-                 if not testImeiChecksum(imei):
-                     print("\nIMEI checksum invalid.")
-                     return False
-        self.setup['IMEI']=imei
-      #  setup['unlock code v1'] = computeUnlockCode(imei)
-        return True
-
+        modem = modemClass(self.setup['serial port'])
+        self.setup['IMEI']=modem.getIMEI()
+        del modem
     def getLockStatus(self):
-        try:
-            lockInfo = checkLockStatus(self.setup['serial port'])
-            if not lockInfo:
-                return False
-            self.setup['lock status'] = lockInfo['lockStatus']
+        modem = modemClass(self.setup['serial port'])
+        lockInfo=modem.getLock()
+        del modem
+        if not lockInfo == False:
             self.setup['lock try remaining'] = lockInfo['remaining']
-            self.setup['mobile carrier'] = lockInfo['carrier']
-        except:
-            print("\nAn error occurred when trying to check the SIM lock.")
-            return False
-        else:
-            ls = lockInfo['lockStatus']
-            if ls == 0:
-                print("\nCouldn't obtain SIM lock status.")
-                print("Further operations would be dangerous.")
-                return False 
-            elif ls == 2:
-                print("\nThe modem is already unlocked for this SIM.")
-                return True
-            elif ls == 3:
-                print("\nThe modem is hard locked,")
-                print("This program cannot help you.")
-                return False
-            else:
-                print("\nThis SIM should be unlockable...")
-                print("Remaining attempts: ", lockInfo['remaining'])
-                print("Exceeding this will hard-lock the modem")
-                return False
-            return True
+            self.setup['mobile carrier']     = lockInfo['carrier']
+            self.setup['lock status']        = lockInfo['lockStatus']
     def getUnlockCode(self):
         self.setup['unlock code']= computeUnlockCode(self.setup['IMEI'])
     def title(self, text):
@@ -224,6 +204,103 @@ class argvClass:
             if ar =='-m':
                 self.setup['menu']=1
 
+class modemClass:
+    connection = ""
+    connected = False
+    port = ""
+    lastRead = ""
+    def connect(self):
+        if self.connected:
+            self.disconnect()
+        print('connetcting to ' + self.port + ' .. ', end='' )
+        try:
+            self.connection = serial.Serial(port = self.port,
+                timeout = 15, xonxoff=False, rtscts=True, dsrdtr=True)
+            self.connected = True
+            print(' ok')
+            return True
+        except:
+            print(' failed')
+            return False
+    def disconnect(self):
+        print('disconnetcting  ... ', end='' )
+        try:
+            self.connection.close()
+            print(' ok')
+            return True
+        except:
+            print(' failed')
+            return False
+    def flush(self):
+        self.lastRead = ""
+        self.debug("flush")
+        self.connection.flushInput()
+    def write(self,string ):
+        self.flush()
+        self.debug("write - " + str(string)) 
+        self.connection.write(string.encode())
+    def read(self,byts):
+        self.lastRead =  self.connection.read(byts).decode('utf8')
+        self.debug("read - " + self.lastRead)
+        return self.lastRead
+    def search(self, write, expectation,byts):
+        self.connect()
+        self.write(write)
+        self.read(byts)
+        self.disconnect
+        return re.search(expectation, self.lastRead)
+    def test(self):
+        self.connect()
+        self.write('AT\r\n')
+        self.lastRead =  self.connection.read(4).decode('utf8')
+        if self.lastRead == '':
+            return 0
+        return 1
+    def getIMEI(self):
+        match = self.search('AT+CGSN\r\n','\\r\\n(\d{15})\\r\\n', 32)
+        if match:
+            print("Found IMEI: " + match.group(1))
+            return match.group(1)
+        else:
+             print("IMEI not found")
+        return '?'
+    def getLock(self):
+        match = self.search('AT^CARDLOCK?\r\n', 'CARDLOCK: (\d),(\d\d?),(\d+)\r',32)
+        status = {
+            'lockStatus' : "?",
+            'remaning'   : "?",
+            'carrier'    : "?"
+        }
+        if match:
+            status['lockStatus'] = int(match.group(1)) 
+            status['remaining'] = int(match.group(2))
+            status['carrier'] = int(match.group(3))
+        else:
+            return False
+        return status
+    def unLock(self, unlockCode):
+        self.write('AT^CARDLOCK="'+ str(unlockCode) + '"\r\n')
+        self.read(64)
+    def generateUnlockCodeV1(self):
+        salt = '5e8dd316726b0335'
+        digest = hashlib.md5((imei+salt).lower().encode('latin1')).digest().decode('latin1')
+        print(digest)
+        code = 0
+        for i in range(0,4):
+            code += (ord(digest[i])^ord(digest[4+i])^ord(digest[8+i])^ord(digest[12+i])) << (3-i)*8
+        code &= 0x1ffffff
+        code |= 0x2000000
+        return code
+    def debug(self, text):
+        if debugMode:
+            print("modem debug : " + text)
+    def __init__(self, port):
+        print(80*"#")
+        self.port = port
+    def __del__(self):
+        if self.connected:
+            self.disconnect()
+        print(80*"#")
 
 
 # Intro
@@ -345,7 +422,7 @@ def checkImeiCompatibility(imei):
 #            2 = unlocked to the inserted sim
 #            3 = locked and cannot be unlocked
 def checkLockStatus(port):
-    status = {'lockStatus': 0, 'remaining': 0, 'carrier': 0}
+    status = {'lockStatus': "?", 'remaining': "?", 'carrier': "?"}
     print("\nChecking the lock status of the SIM.")
     print("The modem will be given 5 seconds to respond.")
     ser = serial.Serial(port = port,
